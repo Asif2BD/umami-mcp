@@ -1,0 +1,241 @@
+# Umami MCP Server
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server for [Umami Analytics](https://umami.is).
+Ask Claude, Cursor or any MCP client about your traffic — and let it create and manage websites — while your
+credentials stay on your own machine.
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+
+```
+"Which pages drove the most visitors last month, and where did that traffic come from?"
+"Build a funnel from /pricing to /signup to /welcome for the last 30 days."
+"Add analytics for my new site blog.example.com and give me the tracking snippet."
+```
+
+## Why this exists
+
+Umami has no official MCP server, and the community ones target **Umami v2**. Umami v3 renamed
+several things without aliases, so a v2-era client fails against a modern instance:
+
+| | Umami v2 | Umami v3 |
+|---|---|---|
+| Top pages | `/metrics?type=url` | `/metrics?type=path` |
+| Hostnames | `/metrics?type=host` | `/metrics?type=hostname` |
+| UTM data | `/metrics?type=utm_source` | `POST /api/reports/utm` |
+| Funnels, retention, journeys, attribution, revenue | — | `POST /api/reports/*` |
+
+Every endpoint and parameter shape in this server was verified against a live **Umami 3.3.1**
+instance, including the report envelope, which is easy to get wrong: dates go in `parameters`
+as ISO-8601 strings, not in `filters`, and not as the epoch milliseconds the rest of the API uses.
+
+## Security model
+
+An analytics MCP server holds a credential that can read every visitor session you have ever
+recorded — and, if you let it, delete the lot. The design follows from that.
+
+**Your credentials never leave your environment.** Configuration is read only from the process
+environment. There is no telemetry, no phone-home, and no hosted relay. The only host this
+server ever contacts is the `UMAMI_URL` you set. If you self-host it, nothing about your
+analytics ever reaches a third party — including the author of this software.
+
+> Be wary of any Umami MCP that offers a hosted endpoint you point at your instance.
+> Self-hosted Umami has no API keys, so "convenient" hosting means mailing your **admin
+> password** to someone else's server.
+
+**Least privilege by default.** The server starts in `read` mode. Widening is a deliberate act:
+
+| Mode | Adds |
+|---|---|
+| `read` *(default)* | Analytics, reports, listing websites |
+| `write` | Create and update websites and teams |
+| `admin` | User management |
+| `+ UMAMI_MCP_ALLOW_DESTRUCTIVE=true` | Delete website, reset data, delete user |
+
+Withheld tools are **not registered at all**, so they never appear in the model's tool list.
+A tool that was never advertised cannot be invoked by a prompt-injected instruction hidden in,
+say, a referrer string or a page title in your own analytics data.
+
+**Destructive actions need a typed confirmation.** `umami_delete_website` takes a `confirmDomain`
+argument and verifies it against the live record before deleting. A model that reaches for the
+wrong website UUID gets an error, not a wiped dataset.
+
+**Secrets are scrubbed from output.** MCP output flows into a model and often into a chat
+transcript, which cannot be un-said. Passwords, bearer tokens and JWTs are redacted from every
+error and response before they leave the process.
+
+**Refuses to leak credentials over the wire.** Plaintext HTTP to a remote host is rejected at
+startup; it is permitted only for `localhost`, for local development.
+
+## Install
+
+### With npx (no install)
+
+```bash
+npx umami-mcp
+```
+
+### From source
+
+```bash
+git clone https://github.com/asif2bd/umami-mcp.git
+cd umami-mcp
+npm install && npm run build
+cp .env.example .env    # then edit .env
+node dist/index.js
+```
+
+### Docker
+
+```bash
+cp .env.example .env    # then edit .env
+docker compose up -d
+```
+
+## Connect your client
+
+### Claude Code
+
+```bash
+claude mcp add umami \
+  --env UMAMI_URL=https://analytics.example.com \
+  --env UMAMI_USERNAME=mcp-bot \
+  --env UMAMI_PASSWORD=your-password \
+  -- npx -y umami-mcp
+```
+
+### Claude Desktop / Cursor / VS Code
+
+Add to your MCP config file:
+
+```json
+{
+  "mcpServers": {
+    "umami": {
+      "command": "npx",
+      "args": ["-y", "umami-mcp"],
+      "env": {
+        "UMAMI_URL": "https://analytics.example.com",
+        "UMAMI_USERNAME": "mcp-bot",
+        "UMAMI_PASSWORD": "your-password",
+        "UMAMI_MCP_MODE": "read"
+      }
+    }
+  }
+}
+```
+
+Call `umami_whoami` first — it confirms the connection and reports the mode you are running in.
+
+## Running it as a service
+
+Set `UMAMI_MCP_TRANSPORT=http` to expose a streamable-HTTP endpoint at `/mcp`, plus `/health`.
+
+**This server has no authentication of its own.** Anyone who can reach the port can use your
+Umami credentials. Keep it on loopback and tunnel to it:
+
+```bash
+# On the server
+docker compose up -d          # binds 127.0.0.1:3334
+
+# From your laptop
+ssh -N -L 3334:127.0.0.1:3334 you@your-server
+claude mcp add --transport http umami http://127.0.0.1:3334/mcp
+```
+
+If you must expose it publicly, put an authenticating reverse proxy in front. The server warns
+at startup when it is bound to anything other than loopback.
+
+## Tools
+
+| Tool | Requires | Description |
+|---|---|---|
+| `umami_list_websites` | read | List the websites tracked by this Umami instance, with their UUIDs |
+| `umami_get_website` | read | Fetch a single website by UUID, including its domain, owner and creation date. |
+| `umami_create_website` | write | Register a new website for tracking and return its UUID, which is the value to put in the data-website-id attribute of the Umami tracking script. |
+| `umami_update_website` | write | Change a website's name, domain or share slug |
+| `umami_reset_website` | destructive | PERMANENTLY DELETE all collected analytics data for a website, keeping the website itself |
+| `umami_delete_website` | destructive | PERMANENTLY DELETE a website and every event ever recorded for it |
+| `umami_get_tracking_snippet` | read | Return the ready-to-paste HTML script tag that sends data to this Umami instance for a given website. |
+| `umami_get_stats` | read | Headline totals for a website over a period: pageviews, visitors, visits, bounces and total time on site |
+| `umami_get_pageviews` | read | Pageviews and sessions bucketed over time, for charting traffic |
+| `umami_get_metrics` | read | Top values for one dimension, ranked by visitor count -- top pages, referrers, countries, browsers and so on |
+| `umami_get_active_visitors` | read | Number of visitors active on the site in the last few minutes |
+| `umami_get_realtime` | read | Live snapshot of current activity: recent events with country, URL, browser and device, plus rollups by country, URL and referrer |
+| `umami_get_event_stats` | read | Totals for custom tracked events over a period: event count, unique event names, visitors and visits, with a comparison against the preceding period. |
+| `umami_list_sessions` | read | Individual visitor sessions with browser, OS, device, country and region |
+| `umami_get_session_activity` | read | The ordered sequence of pageviews and events for one visitor session -- their path through the site. |
+| `umami_report_utm` | read | Breakdown of traffic by UTM parameters: source, medium, campaign, term and content |
+| `umami_report_funnel` | read | Step-by-step conversion funnel |
+| `umami_report_retention` | read | Cohort retention: of the visitors first seen on a given day, how many returned on each subsequent day. |
+| `umami_report_journey` | read | Most common ordered paths visitors take through the site, as sequences of pages with a count for each. |
+| `umami_report_goal` | read | Progress toward a single goal: how many visitors hit a given path or custom event. |
+| `umami_report_revenue` | read | Revenue over time from events carrying a revenue property, broken down by country, region, referrer and channel |
+| `umami_report_attribution` | read | Credits conversions to acquisition channels -- referrer, paid ads and UTM parameters -- under either a first-click or last-click model. |
+| `umami_list_users` | admin | List Umami user accounts with their roles |
+| `umami_create_user` | admin | Create a Umami user account |
+| `umami_delete_user` | destructive | PERMANENTLY DELETE a user account and the websites they own |
+| `umami_list_teams` | read | List teams and their members. |
+| `umami_create_team` | write | Create a team so websites can be shared between users. |
+| `umami_whoami` | read | Verify that this MCP server can reach the configured Umami instance and report which account it is authenticated as, plus the permission mode the server is running in |
+
+### Time ranges
+
+Every analytics tool accepts a `period` shorthand — `24h`, `7d`, `30d`, `12m`, `today`,
+`yesterday` — instead of epoch milliseconds. Models are reliably good at "last 30 days" and
+unreliably good at timestamp arithmetic, and a miscalculated epoch returns data for the wrong
+window *without erroring*. Explicit `startAt`/`endAt` in epoch milliseconds still work and take
+precedence.
+
+## Configuration
+
+See [.env.example](.env.example) for every option. The essentials:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `UMAMI_URL` | *required* | Your Umami instance |
+| `UMAMI_USERNAME` / `UMAMI_PASSWORD` | | Self-hosted login |
+| `UMAMI_API_KEY` | | Umami Cloud alternative |
+| `UMAMI_MCP_MODE` | `read` | `read` / `write` / `admin` |
+| `UMAMI_MCP_ALLOW_DESTRUCTIVE` | `false` | Unlock delete and reset |
+| `UMAMI_MCP_TRANSPORT` | `stdio` | `stdio` or `http` |
+| `UMAMI_MCP_HOST` | `127.0.0.1` | HTTP bind address |
+| `UMAMI_MCP_PORT` | `3334` | HTTP port |
+
+## Recommended setup
+
+Create a dedicated Umami account for the MCP server rather than reusing your admin login, and
+give it only the websites it needs. Then, if the credential is ever exposed, the blast radius is
+one bot account you can delete — not your administrator.
+
+## Compatibility
+
+Verified against **Umami 3.3.1** (self-hosted, PostgreSQL). Umami Cloud works via `UMAMI_API_KEY`.
+Umami v2 is not supported: the renamed metric types above mean v2 and v3 need different clients,
+and this one targets v3.
+
+## Development
+
+```bash
+npm install
+npm run build
+npm test          # unit tests, no network required
+```
+
+`test/e2e.mjs` and `test/write-e2e.mjs` drive the built server through a real MCP client against
+a live instance. The write test creates a throwaway website on a `.invalid` domain and deletes it
+again; point it at a non-production instance.
+
+## Contributing
+
+Issues and pull requests welcome. Umami v3 exposes around 127 API routes and this server covers
+the most useful ones — session replay, heatmaps, pixels, link tracking, boards and segments are
+all still unmapped. If you add tools, keep the tier and `destructive` flags honest, because the
+whole safety model rests on them.
+
+If the Umami team would like to adopt, fork or upstream this, please open an issue — that is the
+outcome this was built for.
+
+## License
+
+MIT © M Asif Rahman

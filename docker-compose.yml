@@ -1,0 +1,24 @@
+services:
+  umami-mcp:
+    build: .
+    # Or use a published image once you have one:
+    # image: ghcr.io/asif2bd/umami-mcp:latest
+    container_name: umami-mcp
+    restart: unless-stopped
+    # Bound to loopback on purpose. This server has no authentication of its
+    # own, so anything that can reach the port can use your Umami credentials.
+    # Reach it over an SSH tunnel, or front it with an authenticating proxy.
+    ports:
+      - "127.0.0.1:3334:3334"
+    env_file: .env
+    environment:
+      UMAMI_MCP_TRANSPORT: http
+      UMAMI_MCP_HOST: 0.0.0.0
+      UMAMI_MCP_PORT: "3334"
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
