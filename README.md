@@ -89,7 +89,17 @@ startup; it is permitted only for `localhost`, for local development.
 
 ## Install
 
-Three ways to run it, in order of effort.
+Three ways to run it. **Self-hosting is the default and the recommended one** — the hosted
+instance exists so you can try it in two minutes without cloning anything.
+
+| | Runs where | Credentials live | Best for |
+|---|---|---|---|
+| **Hosted** | asif.dev | Sealed in your token, never stored | Trying it out; Claude web and Cowork |
+| **Source** | Your machine | A file only you can read | Daily use in Claude Code |
+| **Docker** | Your server | Your `.env` | Teams, always-on |
+
+If you self-host and want it in Claude web, run it with `UMAMI_MCP_OAUTH=true` behind your own
+domain — then nothing of yours touches anyone else's infrastructure.
 
 ### 1. Use the hosted instance (nothing to install)
 
