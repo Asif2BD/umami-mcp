@@ -3,6 +3,7 @@ import http from 'node:http';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { loadConfig, describeConfig, ConfigError, type Config } from './config.js';
+import { loadEnvFile } from './envfile.js';
 import { UmamiClient } from './client.js';
 import { registerSecrets, redactUnknown } from './redact.js';
 import { buildServer } from './server.js';
@@ -73,6 +74,14 @@ async function startHttp(config: Config, client: UmamiClient) {
 }
 
 async function main() {
+  // Credentials may live in a file the operator controls rather than in the
+  // MCP client's config JSON. Must run before loadConfig reads the env.
+  const envFile = loadEnvFile();
+  if (envFile.path && envFile.loaded > 0) {
+    log(`loaded ${envFile.loaded} setting(s) from ${envFile.path}`);
+  }
+  for (const w of envFile.warnings) log(`WARNING: ${w}`);
+
   let config: Config;
   try {
     config = loadConfig();

@@ -11,4 +11,6 @@ First release.
   the live record.
 - Credential redaction applied to all output.
 - stdio and streamable-HTTP transports.
+- Credentials can live in `~/.config/umami-mcp/env` instead of the MCP client's config JSON,
+  with a startup warning when that file is readable by other users.
 - Relative time ranges (`24h`, `7d`, `30d`, `today`) alongside explicit epoch timestamps.

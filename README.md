@@ -75,6 +75,11 @@ there is no tool.
 takes a `confirmDomain` argument, fetches the live record, and refuses unless they match. A model
 that reaches for the wrong website UUID gets an error, not a wiped dataset.
 
+**Credentials stay out of client config.** Rather than requiring your password inside
+`~/.claude.json` or `mcp.json`, the server reads it from a file you control at
+`~/.config/umami-mcp/env`, and warns if that file is readable by other users. See
+[Credentials](#credentials).
+
 **Secrets are scrubbed from output.** MCP output flows into a model and often into a chat
 transcript, which cannot be un-said. Passwords, bearer tokens and JWTs are redacted from every
 error and response before they leave the process.
@@ -107,21 +112,66 @@ cp .env.example .env    # then edit .env
 docker compose up -d
 ```
 
+## Credentials
+
+Self-hosted Umami has no API keys, so the credential this server holds is a **real account
+password**. MCP clients normally want that embedded in their config JSON — `~/.claude.json`,
+`mcp.json` and friends — which are widely readable, get pasted into issues and screen-shares, and
+are synced between machines by some clients.
+
+So this server reads credentials from a file you control instead. Create it once:
+
+```bash
+mkdir -p ~/.config/umami-mcp
+cat > ~/.config/umami-mcp/env <<'EOF'
+UMAMI_URL=https://analytics.example.com
+UMAMI_USERNAME=mcp-bot
+UMAMI_PASSWORD=your-password
+UMAMI_MCP_MODE=read
+EOF
+chmod 600 ~/.config/umami-mcp/env
+```
+
+The server loads it automatically. It warns on startup if the file is readable by other users.
+
+Lookup order — the first file found wins, and **real environment variables always override the
+file**, so you can still pass settings from the client config when you want to:
+
+1. `$UMAMI_MCP_ENV_FILE`, if set
+2. `~/.config/umami-mcp/env` (or `$XDG_CONFIG_HOME/umami-mcp/env`)
+3. `./.env` in the working directory
+
 ## Connect your client
 
 ### Claude Code
 
+With the credentials file above, the registration carries no secrets at all:
+
 ```bash
-claude mcp add umami \
-  --env UMAMI_URL=https://analytics.example.com \
-  --env UMAMI_USERNAME=mcp-bot \
-  --env UMAMI_PASSWORD=your-password \
-  -- npx -y @asif2bd/umami-mcp
+claude mcp add umami --scope user -- npx -y @asif2bd/umami-mcp
+```
+
+Or point at a local checkout:
+
+```bash
+claude mcp add umami --scope user -- node ~/umami-mcp/dist/index.js
 ```
 
 ### Claude Desktop / Cursor / VS Code
 
-Add to your MCP config file:
+```json
+{
+  "mcpServers": {
+    "umami": {
+      "command": "npx",
+      "args": ["-y", "@asif2bd/umami-mcp"]
+    }
+  }
+}
+```
+
+If you would rather keep everything in one place, environment variables still work and take
+precedence over the file:
 
 ```json
 {
@@ -132,15 +182,29 @@ Add to your MCP config file:
       "env": {
         "UMAMI_URL": "https://analytics.example.com",
         "UMAMI_USERNAME": "mcp-bot",
-        "UMAMI_PASSWORD": "your-password",
-        "UMAMI_MCP_MODE": "read"
+        "UMAMI_PASSWORD": "your-password"
       }
     }
   }
 }
 ```
 
-Call `umami_whoami` first — it confirms the connection and reports the mode you are running in.
+### Check it works
+
+Ask your client to run `umami_whoami`. It reports the instance, the account, and the permission
+mode — the fastest way to confirm the connection and see how much the server is allowed to do:
+
+```json
+{
+  "instance": "https://analytics.example.com",
+  "authenticatedAs": "mcp-bot",
+  "role": "admin",
+  "serverMode": "read",
+  "destructiveOperations": "disabled"
+}
+```
+
+Then try: *"List my Umami websites"*, or *"What were my top pages last week?"*
 
 ## Running it as a service
 
@@ -216,6 +280,7 @@ See [.env.example](.env.example) for every option. The essentials:
 | `UMAMI_MCP_TRANSPORT` | `stdio` | `stdio` or `http` |
 | `UMAMI_MCP_HOST` | `127.0.0.1` | HTTP bind address |
 | `UMAMI_MCP_PORT` | `3334` | HTTP port |
+| `UMAMI_MCP_ENV_FILE` | | Explicit path to a credentials file |
 
 ## Recommended setup
 
