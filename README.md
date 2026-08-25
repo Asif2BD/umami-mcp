@@ -89,28 +89,47 @@ startup; it is permitted only for `localhost`, for local development.
 
 ## Install
 
-### With npx (no install)
+Three ways to run it, in order of effort.
 
-```bash
-npx @asif2bd/umami-mcp
+### 1. Use the hosted instance (nothing to install)
+
+Add a custom connector in Claude pointing at:
+
+```
+https://umami-mcp.asif.dev/mcp
 ```
 
-### From source
+You will be asked for your own Umami URL and login on a consent screen. See
+[Claude web, Cowork, and Claude Code on web](#claude-web-cowork-and-claude-code-on-web)
+for how the credentials are handled.
+
+### 2. From source
 
 ```bash
 git clone https://github.com/Asif2BD/umami-mcp.git
 cd umami-mcp
 npm install && npm run build
-cp .env.example .env    # then edit .env
-node dist/index.js
 ```
 
-### Docker
+Then set up [credentials](#credentials) and register it with your client:
 
 ```bash
+claude mcp add umami --scope user -- node "$PWD/dist/index.js"
+```
+
+Requires Node 20 or newer.
+
+### 3. Docker
+
+```bash
+git clone https://github.com/Asif2BD/umami-mcp.git
+cd umami-mcp
 cp .env.example .env    # then edit .env
 docker compose up -d
 ```
+
+> **npm:** not published yet. Once it is, `npx -y @asif2bd/umami-mcp` will replace the
+> clone-and-build step above. Until then use source or Docker.
 
 ## Credentials
 
@@ -148,13 +167,14 @@ file**, so you can still pass settings from the client config when you want to:
 With the credentials file above, the registration carries no secrets at all:
 
 ```bash
-claude mcp add umami --scope user -- npx -y @asif2bd/umami-mcp
+claude mcp add umami --scope user -- node ~/umami-mcp/dist/index.js
 ```
 
-Or point at a local checkout:
+Use the absolute path to your checkout. If your Node lives under nvm, give the full
+interpreter path too, since MCP clients do not load your shell profile:
 
 ```bash
-claude mcp add umami --scope user -- node ~/umami-mcp/dist/index.js
+claude mcp add umami --scope user -- ~/.nvm/versions/node/v22.22.0/bin/node ~/umami-mcp/dist/index.js
 ```
 
 ### Claude Desktop / Cursor / VS Code
@@ -163,8 +183,8 @@ claude mcp add umami --scope user -- node ~/umami-mcp/dist/index.js
 {
   "mcpServers": {
     "umami": {
-      "command": "npx",
-      "args": ["-y", "@asif2bd/umami-mcp"]
+      "command": "node",
+      "args": ["/absolute/path/to/umami-mcp/dist/index.js"]
     }
   }
 }
@@ -177,8 +197,8 @@ precedence over the file:
 {
   "mcpServers": {
     "umami": {
-      "command": "npx",
-      "args": ["-y", "@asif2bd/umami-mcp"],
+      "command": "node",
+      "args": ["/absolute/path/to/umami-mcp/dist/index.js"],
       "env": {
         "UMAMI_URL": "https://analytics.example.com",
         "UMAMI_USERNAME": "mcp-bot",
