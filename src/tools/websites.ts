@@ -1,21 +1,91 @@
 import { z } from 'zod';
 import { defineTool, websiteIdSchema } from './common.js';
 
+interface Website {
+  id: string;
+  name?: string;
+  domain?: string;
+  teamId?: string | null;
+  teamName?: string;
+  [k: string]: unknown;
+}
+interface Paged {
+  data?: Website[];
+  count?: number;
+  [k: string]: unknown;
+}
+const emptyPage = (): Paged => ({ data: [], count: 0 });
+
 export const websiteTools = [
   defineTool({
     name: 'umami_list_websites',
     title: 'List websites',
     description:
-      'List the websites tracked by this Umami instance, with their UUIDs. ' +
+      'List every website this account can reach, with their UUIDs. ' +
+      'Covers both personally-owned websites and those owned by teams the account belongs to. ' +
       'Every analytics tool needs a websiteId, so this is usually the first call.',
     tier: 'read',
     schema: {
       query: z.string().optional().describe('Filter by name or domain (substring match).'),
+      teamId: z.string().optional().describe('Restrict to a single team\'s websites.'),
       page: z.number().int().min(1).optional().describe('Page number, default 1.'),
       pageSize: z.number().int().min(1).max(200).optional().describe('Results per page, default 20.'),
     },
-    handler: async ({ client }, args) =>
-      client.get('/api/websites', { query: args.query, page: args.page, pageSize: args.pageSize }),
+    handler: async ({ client, config }, args) => {
+      const q = { query: args.query, page: args.page, pageSize: args.pageSize };
+
+      const scopedTeam = args.teamId ?? config.teamId;
+      if (scopedTeam) {
+        const r = await client.get<Paged>(`/api/teams/${encodeURIComponent(scopedTeam)}/websites`, q);
+        return { ...r, scope: `team:${scopedTeam}` };
+      }
+
+      // Umami scopes /api/websites to websites the account owns personally.
+      // Websites owned by a team are only reachable through the team endpoint,
+      // so an account that works purely through team membership -- which is the
+      // recommended setup for a service account -- would otherwise see nothing.
+      const own = await client.get<Paged>('/api/websites', q).catch(() => emptyPage());
+
+      let teams: Paged = emptyPage();
+      try {
+        teams = await client.get<Paged>('/api/me/teams');
+      } catch {
+        /* no team access; personal websites are the whole picture */
+      }
+
+      const seen = new Set((own.data ?? []).map((w) => w.id));
+      const merged: Website[] = [...(own.data ?? [])];
+      // `count` must stay the number of websites that EXIST, not the number
+      // returned by this page. Conflating them makes a model report
+      // "you have 4 websites" when it has merely fetched four of twenty-one.
+      let total = own.count ?? own.data?.length ?? 0;
+
+      for (const team of teams.data ?? []) {
+        const teamId = (team as any).id ?? (team as any).teamId;
+        if (!teamId) continue;
+        try {
+          const tw = await client.get<Paged>(`/api/teams/${encodeURIComponent(teamId)}/websites`, q);
+          total += tw.count ?? tw.data?.length ?? 0;
+          for (const w of tw.data ?? []) {
+            if (seen.has(w.id)) continue;
+            seen.add(w.id);
+            merged.push({ ...w, teamName: (team as any).name ?? undefined });
+          }
+        } catch {
+          /* a team we cannot read is simply skipped */
+        }
+      }
+
+      return {
+        data: merged,
+        count: total,
+        returned: merged.length,
+        scope: 'personal+teams',
+        ...(merged.length < total
+          ? { note: 'More websites exist than were returned. Paging applies per scope; raise pageSize or pass teamId to narrow.' }
+          : {}),
+      };
+    },
   }),
 
   defineTool({
