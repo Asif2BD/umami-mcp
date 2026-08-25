@@ -6,6 +6,7 @@ credentials stay on your own machine.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
+![Umami](https://img.shields.io/badge/Umami-v3-blue)
 
 ```
 "Which pages drove the most visitors last month, and where did that traffic come from?"
@@ -15,8 +16,14 @@ credentials stay on your own machine.
 
 ## Why this exists
 
-Umami has no official MCP server, and the community ones target **Umami v2**. Umami v3 renamed
-several things without aliases, so a v2-era client fails against a modern instance:
+Umami has no official MCP server. Several community ones exist, and if you just want broad API
+coverage you should look at [`0xtlt/umami-mcp`](https://github.com/0xtlt/umami-mcp) first — it
+wraps more of the API than this does. Some of the older servers
+([`jakeyShakey`](https://github.com/jakeyShakey/umami_mcp_server),
+[`mikusnuz`](https://github.com/mikusnuz/umami-mcp),
+[`mittwald`](https://github.com/mittwald/umami-mcp),
+[`Macawls`](https://github.com/Macawls/umami-mcp-server)) were written against the **v2** API and
+break on a modern instance, because v3 renamed things without aliases:
 
 | | Umami v2 | Umami v3 |
 |---|---|---|
@@ -25,9 +32,15 @@ several things without aliases, so a v2-era client fails against a modern instan
 | UTM data | `/metrics?type=utm_source` | `POST /api/reports/utm` |
 | Funnels, retention, journeys, attribution, revenue | — | `POST /api/reports/*` |
 
-Every endpoint and parameter shape in this server was verified against a live **Umami 3.3.1**
-instance, including the report envelope, which is easy to get wrong: dates go in `parameters`
-as ISO-8601 strings, not in `filters`, and not as the epoch milliseconds the rest of the API uses.
+This server exists for two things the others do not do:
+
+**1. Complete, verified v3 report coverage.** All seven v3 report types — funnel, retention,
+journey, goal, revenue, attribution and UTM — were exercised against a live **Umami 3.3.1**
+instance. The report envelope is easy to get wrong: dates go in `parameters` as ISO-8601 strings,
+not in `filters`, and not as the epoch milliseconds the rest of the API uses. Attribution takes
+`first-click` / `last-click`, not the camelCase spellings you would guess.
+
+**2. A capability model rather than a boolean.** See below.
 
 ## Security model
 
@@ -53,12 +66,14 @@ analytics ever reaches a third party — including the author of this software.
 | `+ UMAMI_MCP_ALLOW_DESTRUCTIVE=true` | Delete website, reset data, delete user |
 
 Withheld tools are **not registered at all**, so they never appear in the model's tool list.
-A tool that was never advertised cannot be invoked by a prompt-injected instruction hidden in,
-say, a referrer string or a page title in your own analytics data.
+This is the part that differs from a `READONLY=true` flag: a tool that was never advertised
+cannot be invoked by a prompt-injected instruction hidden in, say, a referrer string or a page
+title inside your own analytics data. There is no runtime check to forget or bypass, because
+there is no tool.
 
-**Destructive actions need a typed confirmation.** `umami_delete_website` takes a `confirmDomain`
-argument and verifies it against the live record before deleting. A model that reaches for the
-wrong website UUID gets an error, not a wiped dataset.
+**Destructive actions need a typed confirmation checked against reality.** `umami_delete_website`
+takes a `confirmDomain` argument, fetches the live record, and refuses unless they match. A model
+that reaches for the wrong website UUID gets an error, not a wiped dataset.
 
 **Secrets are scrubbed from output.** MCP output flows into a model and often into a chat
 transcript, which cannot be un-said. Passwords, bearer tokens and JWTs are redacted from every
@@ -72,13 +87,13 @@ startup; it is permitted only for `localhost`, for local development.
 ### With npx (no install)
 
 ```bash
-npx umami-mcp
+npx @asif2bd/umami-mcp
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/asif2bd/umami-mcp.git
+git clone https://github.com/Asif2BD/umami-mcp.git
 cd umami-mcp
 npm install && npm run build
 cp .env.example .env    # then edit .env
@@ -101,7 +116,7 @@ claude mcp add umami \
   --env UMAMI_URL=https://analytics.example.com \
   --env UMAMI_USERNAME=mcp-bot \
   --env UMAMI_PASSWORD=your-password \
-  -- npx -y umami-mcp
+  -- npx -y @asif2bd/umami-mcp
 ```
 
 ### Claude Desktop / Cursor / VS Code
@@ -113,7 +128,7 @@ Add to your MCP config file:
   "mcpServers": {
     "umami": {
       "command": "npx",
-      "args": ["-y", "umami-mcp"],
+      "args": ["-y", "@asif2bd/umami-mcp"],
       "env": {
         "UMAMI_URL": "https://analytics.example.com",
         "UMAMI_USERNAME": "mcp-bot",
