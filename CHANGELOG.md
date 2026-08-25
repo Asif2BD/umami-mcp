@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2 — 2026-08-25
+
+**Security.** The multi-tenant consent form accepted any URL and would connect to it, which made
+a public deployment usable as an SSRF probe of the host's own network. It now requires https and
+resolves the hostname, refusing loopback, private, link-local and CGNAT targets — including
+hostnames that resolve to them. Single-tenant deployments are unchanged.
+
 ## 0.1.1 — 2026-08-25
 
 - `list_websites` falls back to the instance-wide admin listing when an account owns no websites

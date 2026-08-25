@@ -23,6 +23,19 @@ recorded, and — when the operator enables it — delete websites and users. Tr
   withhold tools by *not registering them*: a tool absent from the tool list cannot be called, no
   matter what a model is persuaded to attempt.
 
+**Server-side request forgery.** In multi-tenant mode any stranger can name the URL the server
+will send credentials to. Left unchecked that makes the consent form a probe of the host's own
+network — submit `http://127.0.0.1:6379` or `https://169.254.169.254` and read the difference
+between "connection refused" and "credentials rejected" to enumerate internal services. The
+consent handler therefore requires https and resolves the hostname, refusing loopback, private,
+link-local and CGNAT addresses, and refusing hostnames that resolve to them. Single-tenant
+deployments are unaffected: there the operator chose the URL, and pointing at localhost is a
+legitimate development setup.
+
+*Residual risk:* the address is validated when the token is issued, not on every request, so a
+hostname whose DNS changes afterwards could later point somewhere internal. Closing that fully
+needs pinning the resolved address into the token; it is not done today.
+
 **What it does not protect against:**
 
 - The HTTP transport has **no authentication of its own**. Anyone who can reach the port can use

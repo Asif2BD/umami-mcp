@@ -5,6 +5,7 @@ import { redactUnknown } from '../redact.js';
 import { consentPage, errorPage } from './consent.js';
 import { MemoryStore } from './store.js';
 import { seal, unseal, verifyPkce, safeEqual, type SealedIdentity, SealError } from './seal.js';
+import { assertPublicTarget, BlockedTargetError } from './ssrf.js';
 
 export interface OAuthOptions {
   /** Public base URL of this server, e.g. https://umami-mcp.example.com */
@@ -256,15 +257,26 @@ export class OAuthProvider {
     if (!MODES.includes(mode)) return rerender('Invalid permission selection.');
     if (!umamiUrl || !username || !password) return rerender('All fields are required.');
 
-    let parsed: URL;
-    try {
-      parsed = new URL(umamiUrl);
-    } catch {
-      return rerender('That does not look like a valid URL.');
-    }
-    const loopback = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
-    if (parsed.protocol !== 'https:' && !loopback) {
-      return rerender('Refusing to send your password over plaintext HTTP. Use an https:// URL.');
+    // When the operator pinned a single instance, that URL is trusted and the
+    // user never chose it. Otherwise a stranger picked this address, so it must
+    // be proven to be a public one before we send credentials to it.
+    if (!this.o.fixedUrl) {
+      try {
+        await assertPublicTarget(umamiUrl);
+      } catch (err) {
+        if (err instanceof BlockedTargetError) return rerender(err.message);
+        return rerender('That address could not be verified.');
+      }
+    } else {
+      try {
+        const parsed = new URL(umamiUrl);
+        const loopback = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+        if (parsed.protocol !== 'https:' && !loopback) {
+          return rerender('Refusing to send your password over plaintext HTTP. Use an https:// URL.');
+        }
+      } catch {
+        return rerender('That does not look like a valid URL.');
+      }
     }
 
     // Prove the credentials work before issuing anything, so a typo fails here

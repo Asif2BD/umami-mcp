@@ -1,6 +1,6 @@
 {
   "name": "@asif2bd/umami-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Model Context Protocol server for Umami Analytics. Self-hosted, credentials never leave your environment.",
   "type": "module",
   "bin": {
