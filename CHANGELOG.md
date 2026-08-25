@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 — 2026-08-25
+
+- `list_websites` falls back to the instance-wide admin listing when an account owns no websites
+  and belongs to no team but holds the admin role. This is what lets a dedicated service account
+  and a human owner both see every website without either losing their dashboard.
+- Published 0.1.0 shipped without this; there is no other change.
+
 ## 0.1.0 — 2026-08-25
 
 First release. Verified against a live Umami 3.3.1 instance.
