@@ -76,6 +76,37 @@ export const websiteTools = [
         }
       }
 
+      // A dedicated service account typically owns nothing and belongs to no
+      // team, so both lists above come back empty and the account appears to
+      // have no analytics at all. When such an account holds the admin role,
+      // fall back to the instance-wide listing -- an admin is entitled to it,
+      // and this is the only arrangement where a service account and a human
+      // owner can both see every website without one of them losing their
+      // dashboard. Deliberately a fallback, not the default: an admin who does
+      // own websites keeps seeing exactly their own.
+      if (merged.length === 0) {
+        let isAdmin = false;
+        try {
+          const me = await client.get<{ user?: { isAdmin?: boolean; role?: string } }>('/api/me');
+          isAdmin = Boolean(me.user?.isAdmin) || me.user?.role === 'admin';
+        } catch {
+          /* cannot determine role; leave the empty result as-is */
+        }
+        if (isAdmin) {
+          try {
+            const all = await client.get<Paged>('/api/admin/websites', q);
+            return {
+              data: all.data ?? [],
+              count: all.count ?? all.data?.length ?? 0,
+              returned: (all.data ?? []).length,
+              scope: 'instance-wide (admin)',
+            };
+          } catch {
+            /* admin listing unavailable; fall through */
+          }
+        }
+      }
+
       return {
         data: merged,
         count: total,
