@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 0.1.0 — 2026-08-25
 
-First release.
+First release. Verified against a live Umami 3.3.1 instance.
 
 - 28 tools: analytics, all seven Umami v3 report types, website management, user administration.
 - Verified against a live Umami 3.3.1 instance (self-hosted, PostgreSQL).
