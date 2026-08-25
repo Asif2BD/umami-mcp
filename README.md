@@ -206,24 +206,73 @@ mode — the fastest way to confirm the connection and see how much the server i
 
 Then try: *"List my Umami websites"*, or *"What were my top pages last week?"*
 
-## Running it as a service
+## Claude web, Cowork, and Claude Code on web
 
-Set `UMAMI_MCP_TRANSPORT=http` to expose a streamable-HTTP endpoint at `/mcp`, plus `/health`.
+Those clients cannot launch a local process, so they need a public HTTPS MCP server — and their
+connector UI accepts **OAuth only**, with no field for a static bearer token or custom header.
 
-**This server has no authentication of its own.** Anyone who can reach the port can use your
-Umami credentials. Keep it on loopback and tunnel to it:
+Hosting the obvious way, with one set of Umami credentials baked in and no authentication, turns
+the URL into an open proxy to that Umami. So this server does OAuth instead, and does it without
+becoming a credential store.
+
+### Use the hosted instance
+
+Add a custom connector in Claude with this URL:
+
+```
+https://umami-mcp.asif.dev/mcp
+```
+
+Claude registers itself, sends you to a consent screen, and asks for **your own** Umami URL,
+username and password. Nothing is shared with other users of the host.
+
+### Host your own
 
 ```bash
-# On the server
-docker compose up -d          # binds 127.0.0.1:3334
+UMAMI_MCP_OAUTH=true
+UMAMI_MCP_TRANSPORT=http
+UMAMI_MCP_ISSUER=https://mcp.example.com      # public HTTPS URL of this server
+UMAMI_MCP_TOKEN_KEY=<32 random bytes>          # keep stable; see below
+UMAMI_MCP_TOKEN_TTL=2592000                    # 30 days
+```
 
-# From your laptop
+Generate the key once and keep it:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Set `UMAMI_URL` as well to pin every user to one instance instead of letting them choose.
+
+### How the credentials are handled
+
+The consent screen verifies the credentials against the Umami instance the user named, then seals
+them into the access token with AES-256-GCM. The server keeps **no session table and stores no
+credentials**: each request decrypts the token, builds an MCP server scoped to that one user,
+serves the call, and discards it.
+
+The honest trade-off: whoever holds `UMAMI_MCP_TOKEN_KEY` can decrypt any token they capture.
+Treat it as the most sensitive value in the deployment. Rotating it invalidates every issued
+token, which is the intended blast-radius control.
+
+Destructive tools are **never** exposed over OAuth, whatever permission the user picks. Their
+typed-confirmation guard assumes a local operator who can see what they are about to delete, and
+a remote caller cannot be shown that.
+
+## Running it as a plain HTTP service
+
+Set `UMAMI_MCP_TRANSPORT=http` without `UMAMI_MCP_OAUTH` for a single-tenant endpoint at `/mcp`,
+plus `/health`.
+
+**In this mode the server has no authentication of its own.** Anyone who can reach the port can
+use your Umami credentials. Keep it on loopback and tunnel to it:
+
+```bash
 ssh -N -L 3334:127.0.0.1:3334 you@your-server
 claude mcp add --transport http umami http://127.0.0.1:3334/mcp
 ```
 
-If you must expose it publicly, put an authenticating reverse proxy in front. The server warns
-at startup when it is bound to anything other than loopback.
+The server warns at startup when it is bound to anything other than loopback.
 
 ## Tools
 
