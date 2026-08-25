@@ -28,12 +28,26 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(text);
 }
 
-function html(res: ServerResponse, status: number, body: string): void {
+function html(res: ServerResponse, status: number, body: string, redirectUri?: string): void {
+  // form-action must name the redirect target as well as 'self'.
+  //
+  // Browsers enforce form-action across the redirect chain that FOLLOWS a form
+  // submission, not just the initial POST. With a bare 'self', the consent form
+  // posts fine and the server answers 302 to the client's redirect_uri -- and
+  // the browser then silently blocks that navigation. The visible symptom is a
+  // Connect button that does nothing at all, which is a miserable thing to debug.
+  let formAction = "'self'";
+  if (redirectUri) {
+    try {
+      formAction += ` ${new URL(redirectUri).origin}`;
+    } catch {
+      /* unparseable redirect_uri is rejected elsewhere */
+    }
+  }
   res.writeHead(status, {
     'content-type': 'text/html; charset=utf-8',
     'cache-control': 'no-store',
-    // The consent page posts only to itself and loads no third-party assets.
-    'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'",
+    'content-security-policy': `default-src 'none'; style-src 'unsafe-inline'; form-action ${formAction}`,
     'x-frame-options': 'DENY',
     'referrer-policy': 'no-referrer',
   });
@@ -208,6 +222,7 @@ export class OAuthProvider {
           scope: q.get('scope') ?? '',
         },
       }),
+      redirectUri,
     );
   }
 

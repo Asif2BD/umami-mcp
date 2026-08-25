@@ -78,8 +78,16 @@ try {
   authUrl.searchParams.set('code_challenge_method', 'S256');
   authUrl.searchParams.set('state', 'xyz123');
 
-  const page = await (await fetch(authUrl)).text();
+  const pageRes = await fetch(authUrl);
+  const page = await pageRes.text();
   ok('renders consent page', page.includes('Connect your Umami') && page.includes('account password'));
+
+  // A bare form-action 'self' lets the POST through but makes the browser block
+  // the 302 that follows it, so Connect appears to do nothing.
+  const csp = pageRes.headers.get('content-security-policy') || '';
+  const redirectOrigin = new URL(redirectUri).origin;
+  ok('CSP form-action allows the redirect target',
+     csp.includes('form-action') && csp.includes(redirectOrigin), `(${csp.split('form-action')[1] || ''})`);
 
   const form = (over = {}) => new URLSearchParams({
     client_id: reg.client_id, redirect_uri: redirectUri,
