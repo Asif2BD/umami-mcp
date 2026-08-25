@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import http from 'node:http';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { startHttp } from './http.js';
 import { loadConfig, describeConfig, ConfigError, type Config } from './config.js';
 import { loadEnvFile } from './envfile.js';
 import { UmamiClient } from './client.js';
@@ -19,58 +18,6 @@ async function startStdio(config: Config, client: UmamiClient) {
   log(`${registered.length} tools available, ${withheld.length} withheld by mode "${config.mode}"`);
   await server.connect(new StdioServerTransport());
   log('ready on stdio');
-}
-
-async function startHttp(config: Config, client: UmamiClient) {
-  const { server, registered, withheld } = buildServer(config, client);
-
-  // Stateless: every request is self-contained, so there is no session store
-  // to leak between callers and no cleanup to get wrong.
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-  await server.connect(transport);
-
-  const httpServer = http.createServer((req, res) => {
-    if (req.url === '/health') {
-      res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, mode: config.mode, tools: registered.length }));
-      return;
-    }
-    if (!req.url?.startsWith('/mcp')) {
-      res.writeHead(404, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: 'not found; the MCP endpoint is /mcp' }));
-      return;
-    }
-
-    const chunks: Buffer[] = [];
-    req.on('data', (c: Buffer) => chunks.push(c));
-    req.on('end', () => {
-      let body: unknown;
-      if (chunks.length) {
-        try {
-          body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        } catch {
-          res.writeHead(400, { 'content-type': 'application/json' });
-          res.end(JSON.stringify({ error: 'malformed JSON body' }));
-          return;
-        }
-      }
-      transport.handleRequest(req, res, body).catch((err) => {
-        log('request failed:', redactUnknown(err));
-        if (!res.headersSent) res.writeHead(500).end();
-      });
-    });
-  });
-
-  await new Promise<void>((resolve) => httpServer.listen(config.port, config.host, resolve));
-  log(`${registered.length} tools available, ${withheld.length} withheld by mode "${config.mode}"`);
-  log(`ready on http://${config.host}:${config.port}/mcp`);
-  if (config.host !== '127.0.0.1' && config.host !== 'localhost') {
-    log(
-      `WARNING: bound to ${config.host}, which may be reachable from the network. ` +
-        'This server has no authentication of its own -- anyone who can reach it can use your Umami credentials. ' +
-        'Bind to 127.0.0.1 and use an SSH tunnel, or put an authenticating proxy in front.',
-    );
-  }
 }
 
 async function main() {
@@ -98,6 +45,17 @@ async function main() {
 
   log(describeConfig(config));
 
+  if (config.oauth?.enabled) {
+    // Multi-tenant: there is no instance to verify at boot. Each user proves
+    // their own credentials on the consent screen before a token is issued.
+    if (config.transport !== 'http') {
+      log('OAuth mode requires the http transport. Set UMAMI_MCP_TRANSPORT=http.');
+      process.exit(78);
+    }
+    await startHttp({ config, log });
+    return;
+  }
+
   const client = new UmamiClient(config);
   try {
     const user = await client.verify();
@@ -108,7 +66,7 @@ async function main() {
     process.exit(69); // EX_UNAVAILABLE
   }
 
-  if (config.transport === 'http') await startHttp(config, client);
+  if (config.transport === 'http') await startHttp({ config, log });
   else await startStdio(config, client);
 }
 
