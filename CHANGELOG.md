@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.3 — 2026-08-26
+
+- Added `server.json` and the `mcpName` field so the server can be published to the official
+  MCP Registry. No functional change.
+
 ## 0.1.2 — 2026-08-25
 
 **Security.** The multi-tenant consent form accepted any URL and would connect to it, which made

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.Asif2BD/umami-mcp",
+  "description": "Query and manage Umami Analytics v3 \u2014 traffic stats, funnels, retention, journeys, attribution and UTM reports, plus website management. Read-only by default.",
+  "repository": {
+    "url": "https://github.com/Asif2BD/umami-mcp",
+    "source": "github"
+  },
+  "version": "0.1.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@asif2bd/umami-mcp",
+      "version": "0.1.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "UMAMI_URL",
+          "description": "Your Umami instance URL, e.g. https://analytics.example.com",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "UMAMI_USERNAME",
+          "description": "Umami username. Self-hosted Umami has no API keys, so a login is required.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        },
+        {
+          "name": "UMAMI_PASSWORD",
+          "description": "Umami password. Prefer a dedicated, limited account over your admin login.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "UMAMI_API_KEY",
+          "description": "Umami Cloud API key, used instead of username and password.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true
+        },
+        {
+          "name": "UMAMI_MCP_MODE",
+          "description": "Permission tier: read (default), write, or admin. Tools above the tier are never registered.",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}
