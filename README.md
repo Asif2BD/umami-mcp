@@ -14,6 +14,13 @@ credentials stay on your own machine.
 "Add analytics for my new site blog.example.com and give me the tracking snippet."
 ```
 
+<!-- Absolute URL so the image also renders on npmjs.com, which does not
+     resolve repository-relative paths. -->
+![umami-mcp answering questions about live traffic](https://raw.githubusercontent.com/Asif2BD/umami-mcp/main/demo/umami-mcp-demo.gif)
+
+<sub>Real numbers from a live Umami 3.3.1 instance, read by a view-only service account.
+Regenerate with `vhs demo/demo.tape`.</sub>
+
 ## Why this exists
 
 Umami has no official MCP server. Several community ones exist, and if you just want broad API
