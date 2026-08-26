@@ -30,7 +30,8 @@ function row(label, value, width = 40) {
   out(`     ${C.key}${l}${C.off}  ${C.val}${value}${C.off}`);
 }
 
-const domain = process.argv[2] ?? 'aiscan.site';
+const domain = process.argv[2] ?? 'demo.umami-mcp.dev';
+const period = process.argv[3] ?? '24h';
 
 const transport = new StdioClientTransport({
   command: process.execPath,
@@ -54,31 +55,31 @@ out(`  ${C.dim}connected as ${C.off}${C.key}${me.authenticatedAs}${C.off}` +
     `${C.dim} · mode ${C.off}${C.key}${me.serverMode}${C.off}` +
     `${C.dim} · ${tools.length} tools · destructive ops ${me.destructiveOperations}${C.off}`);
 
-await ask(`"How is ${domain} doing this week?"`);
+await ask(`"How is ${domain} doing today?"`);
 await tool('umami_list_websites');
 const sites = await call('umami_list_websites', { pageSize: 100 });
 const site = sites.data.find((w) => w.domain === domain) ?? sites.data[0];
 
-await tool('umami_get_stats', 'period=7d');
-const stats = await call('umami_get_stats', { websiteId: site.id, period: '7d' });
+await tool('umami_get_stats', `period=${period}`);
+const stats = await call('umami_get_stats', { websiteId: site.id, period });
 const delta = (now, before) =>
   before ? `${now >= before ? '+' : ''}${Math.round(((now - before) / before) * 100)}%` : '';
 out();
-row('visitors', `${stats.visitors}   ${C.dim}${delta(stats.visitors, stats.comparison?.visitors)}${C.off}`);
-row('pageviews', `${stats.pageviews}   ${C.dim}${delta(stats.pageviews, stats.comparison?.pageviews)}${C.off}`);
+row('visitors', String(stats.visitors));
+row('pageviews', String(stats.pageviews));
 row('visits', String(stats.visits));
 await sleep(900);
 
 await ask('"Which pages pulled the most people in?"');
-await tool('umami_get_metrics', 'type=path · period=7d');
-const paths = await call('umami_get_metrics', { websiteId: site.id, type: 'path', period: '7d', limit: 5 });
+await tool('umami_get_metrics', `type=path · period=${period}`);
+const paths = await call('umami_get_metrics', { websiteId: site.id, type: 'path', period, limit: 5 });
 out();
 for (const p of paths.data) { row(p.x, String(p.y)); await sleep(110); }
 await sleep(900);
 
 await ask('"And where did that traffic come from?"');
-await tool('umami_get_metrics', 'type=referrer · period=7d');
-const refs = await call('umami_get_metrics', { websiteId: site.id, type: 'referrer', period: '7d', limit: 4 });
+await tool('umami_get_metrics', `type=referrer · period=${period}`);
+const refs = await call('umami_get_metrics', { websiteId: site.id, type: 'referrer', period, limit: 4 });
 out();
 if (refs.data.length) { for (const r of refs.data) { row(r.x || '(direct)', String(r.y)); await sleep(110); } }
 else row('(all direct)', '—');

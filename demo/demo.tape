@@ -22,7 +22,7 @@ Enter
 Sleep 500ms
 Show
 
-Type "node demo/demo.mjs aiscan.site"
+Type "node demo/demo.mjs demo.umami-mcp.dev 24h"
 Sleep 600ms
 Enter
 Sleep 15s

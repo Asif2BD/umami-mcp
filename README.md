@@ -18,8 +18,9 @@ credentials stay on your own machine.
      resolve repository-relative paths. -->
 ![umami-mcp answering questions about live traffic](https://raw.githubusercontent.com/Asif2BD/umami-mcp/main/demo/umami-mcp-demo.gif)
 
-<sub>Real numbers from a live Umami 3.3.1 instance, read by a view-only service account.
-Regenerate with `vhs demo/demo.tape`.</sub>
+<sub>A throwaway site with generated traffic, on a live Umami 3.3.1 instance, read by a
+view-only service account — so the counts are small and mean nothing, but every one of them was
+really collected and really queried. Regenerate with `vhs demo/demo.tape`.</sub>
 
 ## Why this exists
 
