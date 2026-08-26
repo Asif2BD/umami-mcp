@@ -4,6 +4,10 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server for [Umami An
 Ask Claude, Cursor or any MCP client about your traffic — and let it create and manage websites — while your
 credentials stay on your own machine.
 
+[![npm](https://img.shields.io/npm/v/@asif2bd/umami-mcp?color=cb3837&logo=npm)](https://www.npmjs.com/package/@asif2bd/umami-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@asif2bd/umami-mcp?color=cb3837)](https://www.npmjs.com/package/@asif2bd/umami-mcp)
+[![CI](https://github.com/Asif2BD/umami-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Asif2BD/umami-mcp/actions/workflows/ci.yml)
+[![MCP Registry](https://img.shields.io/badge/MCP%20Registry-published-0E7C86)](https://registry.modelcontextprotocol.io/?q=umami)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
 ![Umami](https://img.shields.io/badge/Umami-v3-blue)
