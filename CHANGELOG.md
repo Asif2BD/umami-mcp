@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.4 - 2026-08-26
+
+**Fixes native and desktop MCP clients, which could not authenticate at all.**
+
+Redirect URI validation accepted only https and loopback, so every desktop client was
+rejected at registration. Cursor sends `cursor://anysphere.cursor-mcp/oauth/callback`;
+VS Code and other native clients do the same. RFC 8252 lists private-use URI schemes as a
+valid redirect type alongside https and loopback, because a native app has no web server
+to redirect to.
+
+Private-use schemes are now accepted, and PKCE is **required** for them and for loopback:
+the OS hands the callback to whichever app claimed the scheme, so the authorization code
+alone is not a secret. Schemes that can execute or read local data (`javascript:`, `data:`,
+`file:`, `blob:`, `about:`) are still refused, as is plaintext http to a remote host.
+
 ## 0.1.3 — 2026-08-26
 
 - Added `server.json` and the `mcpName` field so the server can be published to the official

@@ -67,7 +67,28 @@ try {
     method: 'POST', headers: {'content-type':'application/json'},
     body: JSON.stringify({ redirect_uris: ['http://evil.example.com/cb'] }),
   });
-  ok('rejects non-HTTPS non-loopback redirect_uri', badReg.status === 400);
+  ok('rejects plaintext http to a remote host', badReg.status === 400);
+
+  // Desktop clients cannot use https or loopback; they claim a URI scheme.
+  const nativeReg = await fetch(`${ISSUER}/register`, {
+    method: 'POST', headers: {'content-type':'application/json'},
+    body: JSON.stringify({ redirect_uris: ['cursor://anysphere.cursor-mcp/oauth/callback'],
+                           client_name: 'Cursor' }),
+  });
+  ok('accepts a private-use scheme (Cursor)', nativeReg.status === 201);
+
+  const nativeAuth = new URL(`${ISSUER}/authorize`);
+  nativeAuth.searchParams.set('client_id', (await nativeReg.clone().json()).client_id);
+  nativeAuth.searchParams.set('redirect_uri', 'cursor://anysphere.cursor-mcp/oauth/callback');
+  const noPkce = await fetch(nativeAuth);
+  ok('requires PKCE for a private-use redirect',
+     noPkce.status === 400 && (await noPkce.text()).includes('PKCE required'));
+
+  const dangerous = await fetch(`${ISSUER}/register`, {
+    method: 'POST', headers: {'content-type':'application/json'},
+    body: JSON.stringify({ redirect_uris: ['javascript:alert(1)'] }),
+  });
+  ok('still rejects javascript: as a redirect', dangerous.status === 400);
 
   const verifier = randomBytes(48).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');

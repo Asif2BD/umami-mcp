@@ -6,6 +6,7 @@ import { consentPage, errorPage } from './consent.js';
 import { MemoryStore } from './store.js';
 import { seal, unseal, verifyPkce, safeEqual, type SealedIdentity, SealError } from './seal.js';
 import { assertPublicTarget, BlockedTargetError } from './ssrf.js';
+import { classifyRedirectUri, requiresPkce, RedirectUriError } from './redirect.js';
 
 export interface OAuthOptions {
   /** Public base URL of this server, e.g. https://umami-mcp.example.com */
@@ -153,20 +154,12 @@ export class OAuthProvider {
       return;
     }
     for (const u of uris) {
-      let parsed: URL;
       try {
-        parsed = new URL(u);
-      } catch {
-        json(res, 400, { error: 'invalid_redirect_uri', error_description: `Not a URL: ${u}` });
-        return;
-      }
-      // Loopback may be plaintext; anything else must be HTTPS, or the code
-      // can be intercepted in transit.
-      const loopback = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
-      if (parsed.protocol !== 'https:' && !loopback) {
+        classifyRedirectUri(u);
+      } catch (err) {
         json(res, 400, {
           error: 'invalid_redirect_uri',
-          error_description: `redirect_uri must use https (or be loopback): ${u}`,
+          error_description: err instanceof RedirectUriError ? err.message : `Invalid redirect_uri: ${u}`,
         });
         return;
       }
@@ -193,8 +186,31 @@ export class OAuthProvider {
       html(res, 400, errorPage('Invalid request', 'client_id and redirect_uri are required.'));
       return;
     }
+
+    let kind;
+    try {
+      kind = classifyRedirectUri(redirectUri);
+    } catch (err) {
+      html(res, 400, errorPage('Invalid redirect URI', err instanceof RedirectUriError ? err.message : 'Unusable redirect_uri.'));
+      return;
+    }
+
     if (q.get('code_challenge') && method !== 'S256') {
       html(res, 400, errorPage('Unsupported PKCE method', 'Only S256 is accepted.'));
+      return;
+    }
+    // A private-use or loopback callback is delivered by the OS to whichever
+    // app claimed it, so the code alone is not a secret. RFC 8252 requires
+    // PKCE here, and without it there is nothing binding the code to this client.
+    if (requiresPkce(kind) && !q.get('code_challenge')) {
+      html(
+        res,
+        400,
+        errorPage(
+          'PKCE required',
+          'This redirect type requires PKCE. Send code_challenge with code_challenge_method=S256.',
+        ),
+      );
       return;
     }
 
