@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { Config } from './config.js';
 import { UmamiClient } from './client.js';
 import { redactUnknown } from './redact.js';
-import { buildServer } from './server.js';
+import { buildServer, SERVER_VERSION } from './server.js';
 import { OAuthProvider } from './oauth/router.js';
 import { deriveKey, SealError } from './oauth/seal.js';
 
@@ -66,6 +66,11 @@ export async function startHttp({ config, log }: HttpDeps): Promise<http.Server>
       res.end(
         JSON.stringify({
           ok: true,
+          // Reported so a deployment can be verified from outside. Without it
+          // there is no way to tell a stale container from a fresh one, which
+          // cost real time diagnosing a deploy that pulled code but never
+          // rebuilt the image.
+          version: SERVER_VERSION,
           mode: oauth ? 'oauth' : config.mode,
           multiTenant: Boolean(oauth && !config.oauth?.fixedUrl),
         }),

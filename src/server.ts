@@ -5,7 +5,7 @@ import { redactUnknown } from './redact.js';
 import { allTools, isAllowed, type ToolContext, type ToolDef } from './tools/index.js';
 
 export const SERVER_NAME = 'umami-mcp';
-export const SERVER_VERSION = '0.1.0';
+export const SERVER_VERSION = '0.1.5';
 
 export interface BuiltServer {
   server: McpServer;
