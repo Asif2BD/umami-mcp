@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 - 2026-10-09
+
+- While unconfigured, a tool call with missing or malformed arguments now returns the
+  "not configured" error instead of an argument-validation error. Previously the SDK checked
+  the arguments first, so a caller could be told to fix arguments when the real problem was
+  the missing configuration. Configured servers validate arguments exactly as before.
+
 ## 0.1.6 - 2026-10-09
 
 **The server now starts over stdio even when it is not configured**, so registries and

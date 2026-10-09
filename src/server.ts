@@ -1,11 +1,12 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { UmamiClient } from './client.js';
 import type { Config } from './config.js';
 import { redactUnknown } from './redact.js';
 import { allTools, isAllowed, type ToolContext, type ToolDef } from './tools/index.js';
 
 export const SERVER_NAME = 'umami-mcp';
-export const SERVER_VERSION = '0.1.6';
+export const SERVER_VERSION = '0.1.7';
 
 export interface BuiltServer {
   server: McpServer;
@@ -56,12 +57,6 @@ export function buildServer(
         },
       },
       async (args: Record<string, any>) => {
-        if (opts.unavailable) {
-          return {
-            isError: true,
-            content: [{ type: 'text' as const, text: `${tool.name} failed: ${opts.unavailable}` }],
-          };
-        }
         try {
           const result = await tool.handler(ctx, args ?? {});
           return {
@@ -77,6 +72,20 @@ export function buildServer(
         }
       },
     );
+  }
+
+  if (opts.unavailable) {
+    // Replace the SDK's tools/call handler outright. Its default validates the
+    // arguments before any tool callback runs, so a call with missing or
+    // malformed arguments would get an "invalid arguments" error instead of
+    // being told the server is not configured -- the one thing worth knowing.
+    const message = opts.unavailable;
+    const names = new Set(registered.map((t) => t.name));
+    server.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const name = request.params.name;
+      const text = names.has(name) ? `${name} failed: ${message}` : `Tool ${name} not found`;
+      return { isError: true, content: [{ type: 'text' as const, text }] };
+    });
   }
 
   return { server, registered, withheld };
