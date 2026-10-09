@@ -5,7 +5,7 @@ import { redactUnknown } from './redact.js';
 import { allTools, isAllowed, type ToolContext, type ToolDef } from './tools/index.js';
 
 export const SERVER_NAME = 'umami-mcp';
-export const SERVER_VERSION = '0.1.5';
+export const SERVER_VERSION = '0.1.6';
 
 export interface BuiltServer {
   server: McpServer;
@@ -13,7 +13,22 @@ export interface BuiltServer {
   withheld: ToolDef[];
 }
 
-export function buildServer(config: Config, client = new UmamiClient(config)): BuiltServer {
+export interface BuildOptions {
+  /**
+   * When set, the server is running without usable configuration: tools are
+   * still listed, but every call returns this message instead of running.
+   * Checked here rather than in the client because several handlers
+   * deliberately tolerate individual endpoint failures, which would turn
+   * "not configured" into a misleading empty result.
+   */
+  unavailable?: string;
+}
+
+export function buildServer(
+  config: Config,
+  client = new UmamiClient(config),
+  opts: BuildOptions = {},
+): BuiltServer {
   const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
   const ctx: ToolContext = { client, config };
 
@@ -41,6 +56,12 @@ export function buildServer(config: Config, client = new UmamiClient(config)): B
         },
       },
       async (args: Record<string, any>) => {
+        if (opts.unavailable) {
+          return {
+            isError: true,
+            content: [{ type: 'text' as const, text: `${tool.name} failed: ${opts.unavailable}` }],
+          };
+        }
         try {
           const result = await tool.handler(ctx, args ?? {});
           return {
