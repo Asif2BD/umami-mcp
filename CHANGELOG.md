@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.6 - 2026-10-09
+
+**The server now starts over stdio even when it is not configured**, so registries and
+inspectors (Glama, MCP Inspector) can list its tools without real credentials.
+
+Previously a missing `UMAMI_URL` or missing credentials made the process exit immediately
+(code 78), which looked like a broken server to anything that only launches it to see what
+it offers. Now, on stdio only, it starts with the read-only tool set and every tool call
+returns the original configuration error, so a user with a bad config still sees exactly
+what to fix. Nothing is ever sent anywhere in this state. Write and admin tools are never
+advertised while unconfigured, whatever `UMAMI_MCP_MODE` says.
+
+HTTP and OAuth deployments are unchanged: a bad configuration still stops them at boot.
+
+- Added `glama.json` so the Glama listing can be claimed by its maintainer.
+
+## 0.1.5 - 2026-09-06
+
+- `/health` reports the running server version.
+
 ## 0.1.4 - 2026-08-26
 
 **Fixes native and desktop MCP clients, which could not authenticate at all.**

@@ -6,6 +6,12 @@ import { loadEnvFile } from './envfile.js';
 import { UmamiClient } from './client.js';
 import { registerSecrets, redactUnknown } from './redact.js';
 import { buildServer } from './server.js';
+import {
+  canStartUnconfigured,
+  unconfiguredClient,
+  unconfiguredConfig,
+  unconfiguredMessage,
+} from './unconfigured.js';
 
 /**
  * On stdio, stdout carries the JSON-RPC stream and must never be polluted.
@@ -13,8 +19,8 @@ import { buildServer } from './server.js';
  */
 const log = (...args: unknown[]) => console.error('[umami-mcp]', ...args);
 
-async function startStdio(config: Config, client: UmamiClient) {
-  const { server, registered, withheld } = buildServer(config, client);
+async function startStdio(config: Config, client: UmamiClient, unavailable?: string) {
+  const { server, registered, withheld } = buildServer(config, client, { unavailable });
   log(`${registered.length} tools available, ${withheld.length} withheld by mode "${config.mode}"`);
   await server.connect(new StdioServerTransport());
   log('ready on stdio');
@@ -35,6 +41,13 @@ async function main() {
   } catch (err) {
     if (err instanceof ConfigError) {
       log('configuration error:', err.message);
+      if (canStartUnconfigured()) {
+        // Lets registries and inspectors list the tools; every call returns
+        // this same error, so a misconfigured user still learns what to fix.
+        log('starting unconfigured: read-only tools are listed, every call will fail until configured.');
+        await startStdio(unconfiguredConfig(), unconfiguredClient(err.message), unconfiguredMessage(err.message));
+        return;
+      }
       process.exit(78); // EX_CONFIG
     }
     throw err;
