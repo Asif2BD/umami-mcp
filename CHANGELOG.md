@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Self-hosted API keys.** Umami 3.4.0 added account API keys to self-hosted instances. They
+  are now sent as `Authorization: Bearer`, which is what self-hosted Umami expects;
+  Umami Cloud (`*.umami.is`) still gets `x-umami-api-key`. Previously every key went in
+  `x-umami-api-key`, a header the self-hosted docs do not list.
+- Bare `umami_…` API keys are redacted from all output.
+- README: point read-only users at Umami's official MCP (3.4.0+) and say what this server
+  adds on top of it: write and admin tools, OAuth multi-tenancy, pre-3.4 instances.
+
 ## 0.1.7 - 2026-10-09
 
 - While unconfigured, a tool call with missing or malformed arguments now returns the

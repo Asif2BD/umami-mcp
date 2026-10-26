@@ -10,7 +10,7 @@ credentials stay on your own machine.
 [![MCP Registry](https://img.shields.io/badge/MCP%20Registry-published-0E7C86)](https://registry.modelcontextprotocol.io/?q=umami)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 ![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)
-![Umami](https://img.shields.io/badge/Umami-v3-blue)
+![Umami](https://img.shields.io/badge/Umami-v3.x-blue)
 
 ```
 "Which pages drove the most visitors last month, and where did that traffic come from?"
@@ -28,7 +28,22 @@ really collected and really queried. Regenerate with `vhs demo/demo.tape`.</sub>
 
 ## Why this exists
 
-Umami has no official MCP server. Several community ones exist, and if you just want broad API
+**Umami now ships an official MCP server** (since v3.4.0, `MCP_ENABLED=1`, endpoint `/mcp`). If
+read-only analytics is all you need, use that: it runs inside Umami, so there is nothing extra to
+deploy. See [the Umami docs](https://docs.umami.is/docs/mcp).
+
+This server is for what the official one deliberately leaves out:
+
+| | Official (`/mcp`) | umami-mcp |
+|---|---|---|
+| Read analytics and reports | yes | yes |
+| Create and update websites, teams, tracking snippets | — | `write` mode |
+| User management | — | `admin` mode |
+| Delete website / reset data | — | opt-in only |
+| Umami older than 3.4 | — | 3.x |
+| Sign-in | API key | API key, password, or OAuth (multi-tenant) |
+
+Several community servers exist too, and if you just want broad API
 coverage you should look at [`0xtlt/umami-mcp`](https://github.com/0xtlt/umami-mcp) first — it
 wraps more of the API than this does. Some of the older servers
 ([`jakeyShakey`](https://github.com/jakeyShakey/umami_mcp_server),
@@ -64,9 +79,10 @@ environment. There is no telemetry, no phone-home, and no hosted relay. The only
 server ever contacts is the `UMAMI_URL` you set. If you self-host it, nothing about your
 analytics ever reaches a third party — including the author of this software.
 
-> Be wary of any Umami MCP that offers a hosted endpoint you point at your instance.
-> Self-hosted Umami has no API keys, so "convenient" hosting means mailing your **admin
-> password** to someone else's server.
+> Be wary of any Umami MCP that offers a hosted endpoint you point at your instance. Before
+> Umami 3.4 a self-hosted instance had no API keys, so "convenient" hosting meant mailing your
+> **admin password** to someone else's server. On 3.4+, give such a service a revocable API key
+> from a dedicated account, never a password.
 
 **Least privilege by default.** The server starts in `read` mode. Widening is a deliberate act:
 
@@ -155,8 +171,10 @@ docker compose up -d
 
 ## Credentials
 
-Self-hosted Umami has no API keys, so the credential this server holds is a **real account
-password**. MCP clients normally want that embedded in their config JSON — `~/.claude.json`,
+On Umami 3.4.0 or later, prefer an **API key** (Settings → API keys) in `UMAMI_API_KEY`: it can
+be revoked on its own without changing a password. It is sent as `Authorization: Bearer` to a
+self-hosted instance and as `x-umami-api-key` to Umami Cloud. Older instances have no API keys,
+so the credential is a **real account password**. Either way, MCP clients normally want that embedded in their config JSON — `~/.claude.json`,
 `mcp.json` and friends — which are widely readable, get pasted into issues and screen-shares, and
 are synced between machines by some clients.
 
@@ -365,7 +383,7 @@ See [.env.example](.env.example) for every option. The essentials:
 |---|---|---|
 | `UMAMI_URL` | *required* | Your Umami instance |
 | `UMAMI_USERNAME` / `UMAMI_PASSWORD` | | Self-hosted login |
-| `UMAMI_API_KEY` | | Umami Cloud alternative |
+| `UMAMI_API_KEY` | | API key instead of a login (Umami Cloud, or self-hosted 3.4.0+) |
 | `UMAMI_MCP_MODE` | `read` | `read` / `write` / `admin` |
 | `UMAMI_MCP_ALLOW_DESTRUCTIVE` | `false` | Unlock delete and reset |
 | `UMAMI_MCP_TRANSPORT` | `stdio` | `stdio` or `http` |
@@ -381,7 +399,8 @@ one bot account you can delete — not your administrator.
 
 ## Compatibility
 
-Verified against **Umami 3.3.1** (self-hosted, PostgreSQL). Umami Cloud works via `UMAMI_API_KEY`.
+Verified against **Umami 3.3.1** and runs in production against **3.4.1** (self-hosted, PostgreSQL).
+Umami Cloud works via `UMAMI_API_KEY`; self-hosted 3.4.0+ accepts it too.
 Umami v2 is not supported: the renamed metric types above mean v2 and v3 need different clients,
 and this one targets v3.
 

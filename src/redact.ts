@@ -30,6 +30,8 @@ const PATTERNS: [RegExp, string][] = [
   [/(authorization\s*:\s*bearer\s+)[A-Za-z0-9._~+/=-]+/gi, '$1[redacted]'],
   // Bare JWTs.
   [/\beyJ[A-Za-z0-9._-]{20,}/g, '[redacted-jwt]'],
+  // Self-hosted Umami account API keys (3.4.0+).
+  [/\bumami_[A-Za-z0-9_-]{16,}/g, '[redacted-api-key]'],
 ];
 
 export function redact(input: string): string {
