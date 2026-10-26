@@ -93,8 +93,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 
   if (!oauthEnabled && !apiKey && !(username && password)) {
     throw new ConfigError(
-      'No credentials found. Set UMAMI_USERNAME and UMAMI_PASSWORD (self-hosted), ' +
-        'or UMAMI_API_KEY (Umami Cloud). ' +
+      'No credentials found. Set UMAMI_API_KEY (Umami Cloud, or self-hosted 3.4.0+), ' +
+        'or UMAMI_USERNAME and UMAMI_PASSWORD. ' +
         'Alternatively set UMAMI_MCP_OAUTH=true to run multi-tenant, where each user brings their own.',
     );
   }

@@ -4,11 +4,25 @@ import { redact, redactUnknown } from './redact.js';
 /**
  * A thin, dependency-free client for the Umami HTTP API.
  *
- * Self-hosted Umami has no API keys: you POST credentials to /api/auth/login
- * and receive a bearer token. That token is held in memory only, never
- * written to disk, and refreshed automatically when the server rejects it.
- * Umami Cloud does issue API keys, which are sent as x-umami-api-key instead.
+ * With a username and password, it POSTs them to /api/auth/login and receives
+ * a bearer token. That token is held in memory only, never written to disk,
+ * and refreshed automatically when the server rejects it.
+ *
+ * API keys skip the login. Self-hosted Umami (3.4.0+) takes its account keys
+ * as `Authorization: Bearer`; Umami Cloud takes its keys as x-umami-api-key.
  */
+
+/** The header an API key is sent in, which depends on who issued it. */
+export function apiKeyHeader(url: string, apiKey: string): Record<string, string> {
+  let host = '';
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    /* config validation already rejected malformed URLs */
+  }
+  const cloud = host === 'umami.is' || host.endsWith('.umami.is');
+  return cloud ? { 'x-umami-api-key': apiKey } : { authorization: `Bearer ${apiKey}` };
+}
 
 export class UmamiError extends Error {
   constructor(
@@ -68,7 +82,7 @@ export class UmamiClient {
   }
 
   private async authHeaders(): Promise<Record<string, string>> {
-    if (this.usesApiKey) return { 'x-umami-api-key': this.config.apiKey! };
+    if (this.usesApiKey) return apiKeyHeader(this.config.url, this.config.apiKey!);
     const token = this.token ?? (await this.login());
     return { authorization: `Bearer ${token}` };
   }
